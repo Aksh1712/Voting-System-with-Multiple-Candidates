@@ -1,0 +1,93 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+
+contract VotingSystem {
+    struct Candidate {
+        uint256 id;
+        string name;
+        uint256 votes;
+    }
+
+    // State variables
+    mapping(uint256 => Candidate) public candidates;
+    mapping(address => bool) public hasVoted;
+    uint256 public candidatesCount;
+    address public owner;
+    bool public votingOpen;
+
+    // Events
+    event CandidateAdded(uint256 id, string name);
+    event Voted(address voter, uint256 candidateId);
+    event VotingStatusChanged(bool isOpen);
+
+    // Constructor
+    constructor() {
+        owner = msg.sender;
+        votingOpen = false;
+    }
+
+    // Modifiers
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only the owner can call this function");
+        _;
+    }
+
+    modifier isVotingOpen() {
+        require(votingOpen, "Voting is not open");
+        _;
+    }
+
+    // Functions
+    function addCandidate(string memory _name) public onlyOwner {
+        candidatesCount++;
+        candidates[candidatesCount] = Candidate(candidatesCount, _name, 0);
+        emit CandidateAdded(candidatesCount, _name);
+    }
+
+    function startVoting() public onlyOwner {
+        require(!votingOpen, "Voting is already open");
+        require(candidatesCount > 0, "Add at least one candidate before starting the vote");
+        votingOpen = true;
+        emit VotingStatusChanged(true);
+    }
+
+    function endVoting() public onlyOwner {
+        require(votingOpen, "Voting is already closed");
+        votingOpen = false;
+        emit VotingStatusChanged(false);
+    }
+
+    function vote(uint256 _candidateId) public isVotingOpen {
+        require(!hasVoted[msg.sender], "You have already voted");
+        require(_candidateId > 0 && _candidateId <= candidatesCount, "Invalid candidate ID");
+
+        hasVoted[msg.sender] = true;
+        candidates[_candidateId].votes++;
+        emit Voted(msg.sender, _candidateId);
+    }
+
+    function getCandidate(uint256 _candidateId) public view returns (uint256 id, string memory name, uint256 votes) {
+        require(_candidateId > 0 && _candidateId <= candidatesCount, "Invalid candidate ID");
+        Candidate memory candidate = candidates[_candidateId];
+        return (candidate.id, candidate.name, candidate.votes);
+    }
+
+    function getWinner() public view returns (uint256 id, string memory name, uint256 votes) {
+        require(!votingOpen, "Voting is still open");
+        require(candidatesCount > 0, "No candidates registered");
+
+        uint256 maxVotes = 0;
+        uint256 winnerId = 0;
+
+        for (uint256 i = 1; i <= candidatesCount; i++) {
+            if (candidates[i].votes > maxVotes) {
+                maxVotes = candidates[i].votes;
+                winnerId = i;
+            }
+        }
+
+        require(winnerId > 0, "No votes cast");
+        Candidate memory winner = candidates[winnerId];
+        return (winner.id, winner.name, winner.votes);
+    }
+}
